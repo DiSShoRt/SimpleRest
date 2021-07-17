@@ -6,129 +6,126 @@ import (
 	"time"
 )
 
+
 type Task struct {
-	Id   int       `json:"id"`
+	ID   int       `json:"id"`
 	Text string    `json:"text"`
 	Tags []string  `json:"tags"`
 	Due  time.Time `json:"due"`
+
 }
 
-// TaskStore is a simple in-memory database of tasks; TaskStore methods are
-// safe to call concurrently.
-type TaskStore struct {
-	sync.Mutex
 
-	tasks  map[int]Task
-	nextId int
+type TaskStore struct {
+	mux  sync.Mutex
+	tasks map[int]Task
+	nextID int
 }
 
 func New() *TaskStore {
 	ts := &TaskStore{}
 	ts.tasks = make(map[int]Task)
-	ts.nextId = 0
+	ts.nextID = 0
 	return ts
 }
 
-// CreateTask creates a new task in the store.
-func (ts *TaskStore) CreateTask(text string, tags []string, due time.Time) int {
-	ts.Lock()
-	defer ts.Unlock()
+func (ts *TaskStore) CreateTask(tx string, tags []string, due time.Time) int {
+	ts.mux.Lock()
 
 	task := Task{
-		Id:   ts.nextId,
-		Text: text,
-		Due:  due}
+		ID: ts.nextID,
+		Text: tx,
+		Due: due,
+	}
+
 	task.Tags = make([]string, len(tags))
 	copy(task.Tags, tags)
+	
 
-	ts.tasks[ts.nextId] = task
-	ts.nextId++
-	return task.Id
+	ts.tasks[ts.nextID] = task
+	ts.nextID++
+	return task.ID
 }
 
-// GetTask retrieves a task from the store, by id. If no such id exists, an
-// error is returned.
+
 func (ts *TaskStore) GetTask(id int) (Task, error) {
-	ts.Lock()
-	defer ts.Unlock()
+	ts.mux.Lock()
+	defer ts.mux.Unlock()
 
 	t, ok := ts.tasks[id]
 	if ok {
 		return t, nil
-	} else {
-		return Task{}, fmt.Errorf("task with id=%d not found", id)
+	} else { 
+		return Task{}, fmt.Errorf("Please change input id = %d, task not found", id)
 	}
 }
 
-// DeleteTask deletes the task with the given id. If no such id exists, an error
-// is returned.
+
 func (ts *TaskStore) DeleteTask(id int) error {
-	ts.Lock()
-	defer ts.Unlock()
+	ts.mux.Lock()
+	defer ts.mux.Unlock()
 
 	if _, ok := ts.tasks[id]; !ok {
-		return fmt.Errorf("task with id=%d not found", id)
-	}
+		return fmt.Errorf("Please change input id = %d, task not found", id)
 
-	delete(ts.tasks, id)
-	return nil
+	} else { 
+
+		delete(ts.tasks, id)
+		return nil
+	}
 }
 
-// DeleteAllTasks deletes all tasks in the store.
+
 func (ts *TaskStore) DeleteAllTask() error {
-	ts.Lock()
-	defer ts.Unlock()
+	ts.mux.Lock()
+	defer ts.mux.Unlock()
 
 	ts.tasks = make(map[int]Task)
 	return nil
 }
 
-// GetAllTasks returns all the tasks in the store, in arbitrary order.
-func (ts *TaskStore) GetAllTask() []Task {
-	ts.Lock()
-	defer ts.Unlock()
 
-	allTasks := make([]Task, 0, len(ts.tasks))
+func (ts *TaskStore) GetAllTask() []Task {
+	ts.mux.Lock()
+	defer ts.mux.Unlock()
+
+	all := make([]Task, 0, len(ts.tasks))
 	for _, task := range ts.tasks {
-		allTasks = append(allTasks, task)
+		all = append(all, task)
 	}
-	return allTasks
+	return all
 }
 
-// GetTasksByTag returns all the tasks that have the given tag, in arbitrary
-// order.
+
 func (ts *TaskStore) GetTaskByTags(tag string) []Task {
-	ts.Lock()
-	defer ts.Unlock()
+	ts.mux.Lock()
+	defer ts.mux.Unlock()
 
 	var tasks []Task
 
-taskloop:
-	for _, task := range ts.tasks {
-		for _, taskTag := range task.Tags {
-			if taskTag == tag {
+	for _,  task := range ts.tasks {
+		for _, tasktag := range task.Tags {
+			if tasktag == tag {
 				tasks = append(tasks, task)
-				continue taskloop
+				break
 			}
 		}
 	}
 	return tasks
 }
 
-// GetTasksByDueDate returns all the tasks that have the given due date, in
-// arbitrary order.
-func (ts *TaskStore) GetTaskByDueyear(year int, month time.Month, day int) []Task {
-	ts.Lock()
-	defer ts.Unlock()
+
+func (ts *TaskStore) GetTaskByDue(year int, mn time.Month, day int) []Task {
+	ts.mux.Lock()
+	defer ts.mux.Unlock()
 
 	var tasks []Task
 
 	for _, task := range ts.tasks {
 		y, m, d := task.Due.Date()
-		if y == year && m == month && d == day {
+		if y == year && m == mn && d == day {
 			tasks = append(tasks, task)
 		}
 	}
-
 	return tasks
 }
