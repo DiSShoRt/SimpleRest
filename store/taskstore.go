@@ -29,7 +29,7 @@ func New() *TaskStore {
 	return ts
 }
 
-func (ts *TaskStore) CreateTask(tx string, tags []string,due time.Time) int {
+func (ts *TaskStore) CreateTask(tx string, tags []string, due time.Time) int {
 	ts.mux.Lock()
 
 	task := Task{
@@ -41,7 +41,7 @@ func (ts *TaskStore) CreateTask(tx string, tags []string,due time.Time) int {
 	task.Tags = make([]string, len(tags))
 	copy(task.Tags, tags)
 	defer ts.mux.Unlock()
-	ts.NextID++
+	ts.nextID++
 	return task.ID
 }
 
@@ -88,7 +88,7 @@ func (ts *TaskStore) GetAllTask() []Task {
 	defer ts.mux.Unlock()
 
 	all := make([]Task, 0, len(ts.tasks))
-	for _, task :=range ts.tasks {
+	for _, task := range ts.tasks {
 		all = append(all, task)
 	}
 	return all
