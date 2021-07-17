@@ -40,7 +40,7 @@ func (ts *TaskStore) CreateTask(tx string, tags []string,due time.Time) int {
 
 	task.Tags = make([]string, len(tags))
 	copy(task.Tags, tags)
-	ts.mux.Unlock()
+	defer ts.mux.Unlock()
 	return task.ID
 }
 
