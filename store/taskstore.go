@@ -86,7 +86,7 @@ func (ts *TaskStore) GetAllTask() []Task {
 	ts.mux.Lock()
 	defer ts.mux.Unlock()
 
-	all := make([]Task, len(ts.tasks))
+	all := make([]Task, 0, len(ts.tasks))
 	for _, task :=range ts.tasks {
 		all = append(all, task)
 	}
