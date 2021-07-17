@@ -31,6 +31,7 @@ func New() *TaskStore {
 
 func (ts *TaskStore) CreateTask(tx string, tags []string, due time.Time) int {
 	ts.mux.Lock()
+	defer ts.mux.Unlock()
 
 	task := Task{
 		ID: ts.nextID,
@@ -40,7 +41,6 @@ func (ts *TaskStore) CreateTask(tx string, tags []string, due time.Time) int {
 
 	task.Tags = make([]string, len(tags))
 	copy(task.Tags, tags)
-	defer ts.mux.Unlock()
 	ts.tasks[ts.nextID] = task
 	ts.nextID++
 	return task.ID
