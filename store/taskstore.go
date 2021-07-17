@@ -31,7 +31,7 @@ func New() *TaskStore {
 
 func (ts *TaskStore) CreateTask(tx string, tags []string, due time.Time) int {
 	ts.mux.Lock()
-
+	defer ts.mux.Unlock()
 	task := Task{
 		ID: ts.nextID,
 		Text: tx,
