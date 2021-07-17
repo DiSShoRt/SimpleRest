@@ -8,10 +8,10 @@ import (
 
 
 type Task struct {
-	ID   int       `json:"id,omitempty"`
-	Text string    `json:"text,omitempty"`
-	Tags []string  `json:"tags,omitempty"`
-	Due  time.Time `json:"due,omitempty"`
+	ID   int       `json:"id"`
+	Text string    `json:"text"`
+	Tags []string  `json:"tags"`
+	Due  time.Time `json:"due"`
 
 }
 
