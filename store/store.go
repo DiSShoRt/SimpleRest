@@ -1,4 +1,4 @@
-package store
+package taskstore
 
 import (
 	"fmt"
@@ -7,10 +7,8 @@ import (
 )
 
 
-type post struct {
+type Task struct {
 	ID   int       `json:"id"`
-	Name string    `json:"name"`
-	Age  int       `json:"age"`
 	Text string    `json:"text"`
 	Tags []string  `json:"tags"`
 	Due  time.Time `json:"due"`
@@ -18,118 +16,117 @@ type post struct {
 }
 
 
-type postStore struct {
+type TaskStore struct {
 	mux  sync.Mutex
-	posts map[int]post
+	tasks map[int]Task
 	nextID int
 }
 
-func New() *postStore {
-	ts := &postStore{}
-	ts.posts = make(map[int]post)
+func New() *TaskStore {
+	ts := &TaskStore{}
+	ts.tasks = make(map[int]Task)
 	ts.nextID = 0
 	return ts
 }
 
-func (ts *postStore) Createpost(name string, age int, tx string, tags []string, due time.Time) int {
+func (ts *TaskStore) CreateTask(tx string, tags []string, due time.Time) int {
 	ts.mux.Lock()
+	defer ts.mux.Unlock()
 
-	post := post{
+	task := Task{
 		ID: ts.nextID,
 		Text: tx,
 		Due: due,
-		Age:age,
-		Name:name,
 	}
 
-	post.Tags = make([]string, len(tags))
-	copy(post.Tags, tags)
+	task.Tags = make([]string, len(tags))
+	copy(task.Tags, tags)
 	
 
-	ts.posts[ts.nextID] = post
+	ts.tasks[ts.nextID] = task
 	ts.nextID++
-	return post.ID
+	return task.ID
 }
 
 
-func (ts *postStore) Getpost(id int) (post, error) {
+func (ts *TaskStore) GetTask(id int) (Task, error) {
 	ts.mux.Lock()
 	defer ts.mux.Unlock()
 
-	t, ok := ts.posts[id]
+	t, ok := ts.tasks[id]
 	if ok {
 		return t, nil
 	} else { 
-		return post{}, fmt.Errorf("Please change input id = %d, post not found", id)
+		return Task{}, fmt.Errorf("Please change input id = %d, task not found", id)
 	}
 }
 
 
-func (ts *postStore) Deletepost(id int) error {
+func (ts *TaskStore) DeleteTask(id int) error {
 	ts.mux.Lock()
 	defer ts.mux.Unlock()
 
-	if _, ok := ts.posts[id]; !ok {
-		return fmt.Errorf("Please change input id = %d, post not found", id)
+	if _, ok := ts.tasks[id]; !ok {
+		return fmt.Errorf("Please change input id = %d, task not found", id)
 
 	} else { 
 
-		delete(ts.posts, id)
+		delete(ts.tasks, id)
 		return nil
 	}
 }
 
 
-func (ts *postStore) DeleteAllpost() error {
+func (ts *TaskStore) DeleteAllTask() error {
 	ts.mux.Lock()
 	defer ts.mux.Unlock()
 
-	ts.posts = make(map[int]post)
+	ts.tasks = make(map[int]Task)
 	return nil
 }
 
 
-func (ts *postStore) GetAllpost() []post {
+func (ts *TaskStore) GetAllTask() []Task {
 	ts.mux.Lock()
 	defer ts.mux.Unlock()
 
-	all := make([]post, 0, len(ts.posts))
-	for _, post := range ts.posts {
-		all = append(all, post)
+	all := make([]Task, 0, len(ts.tasks))
+	for _, task := range ts.tasks {
+		all = append(all, task)
 	}
 	return all
 }
 
 
-func (ts *postStore) GetpostByTags(tag string) []post {
+func (ts *TaskStore) GetTaskByTags(tag string) []Task {
 	ts.mux.Lock()
 	defer ts.mux.Unlock()
 
-	var posts []post
+	var tasks []Task
 
-	for _,  post := range ts.posts {
-		for _, posttag := range post.Tags {
-			if posttag == tag {
-				posts = append(posts, post)
+	for _,  task := range ts.tasks {
+		for _, tasktag := range task.Tags {
+			if tasktag == tag {
+				tasks = append(tasks, task)
 				break
 			}
 		}
 	}
-	return posts
+	return tasks
 }
 
 
-func (ts *postStore) GetpostByDue(year int, mn time.Month, day int) []post {
+func (ts *TaskStore) GetTaskByDue(year int, mn time.Month, day int) []Task {
 	ts.mux.Lock()
 	defer ts.mux.Unlock()
 
-	var posts []post
+	var tasks []Task
 
-	for _, post := range ts.posts {
-		y, m, d := post.Due.Date()
+	for _, task := range ts.tasks {
+		y, m, d := task.Due.Date()
 		if y == year && m == mn && d == day {
-			posts = append(posts, post)
+			tasks = append(tasks, task)
 		}
 	}
-	return posts
+	return tasks
 }
