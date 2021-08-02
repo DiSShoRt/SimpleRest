@@ -6,127 +6,129 @@ import (
 	"time"
 )
 
-
-type Task struct {
-	ID   int       `json:"id"`
-	Text string    `json:"text"`
-	Tags []string  `json:"tags"`
-	Due  time.Time `json:"due"`
-
+type Posts struct {
+	ID     int       `json:"id"`
+	Author string    `json:"author"'`
+	Text   string    `json:"text"`
+	Tags   []string  `json:"tags"`
+	Due    time.Time `json:"due"`
 }
 
-
-type TaskStore struct {
-	mux  sync.Mutex
-	tasks map[int]Task
+type PostStore struct {
+	mux    sync.Mutex
+	Post   map[int]Posts
 	nextID int
 }
 
-func New() *TaskStore {
-	ts := &TaskStore{}
-	ts.tasks = make(map[int]Task)
+type PostStoreManager interface {
+	CreatePost(tx string, tags []string, due time.Time) int
+	GetPost(id int) (Posts, error)
+	DeletePost(id int) error
+	DeleteAllPost() error
+	GetAllPost() []Posts
+	GetPostByTags(tag string) []Posts
+	GetPostByDue(year int, mn time.Month, day int) []Posts
+}
+
+func New() *PostStore {
+	ts := &PostStore{}
+	ts.Post = make(map[int]Posts)
 	ts.nextID = 0
 	return ts
 }
 
-func (ts *TaskStore) CreateTask(tx string, tags []string, due time.Time) int {
-	ts.mux.Lock()
-	defer ts.mux.Unlock()
+func (p *PostStore) CreatePost(tx string, author string, tags []string, due time.Time) int {
+	p.mux.Lock()
+	defer p.mux.Unlock()
 
-	task := Task{
-		ID: ts.nextID,
-		Text: tx,
-		Due: due,
+	post := Posts{
+		ID:     p.nextID,
+		Author: author,
+		Text:   tx,
+		Due:    due,
 	}
 
-	task.Tags = make([]string, len(tags))
-	copy(task.Tags, tags)
-	
+	post.Tags = make([]string, len(tags))
+	copy(post.Tags, tags)
 
-	ts.tasks[ts.nextID] = task
-	ts.nextID++
-	return task.ID
+	p.Post[p.nextID] = post
+	p.nextID++
+	return post.ID
 }
 
+func (p *PostStore) GetPost(id int) (Posts, error) {
+	p.mux.Lock()
+	defer p.mux.Unlock()
 
-func (ts *TaskStore) GetTask(id int) (Task, error) {
-	ts.mux.Lock()
-	defer ts.mux.Unlock()
-
-	t, ok := ts.tasks[id]
+	t, ok := p.Post[id]
 	if ok {
 		return t, nil
-	} else { 
-		return Task{}, fmt.Errorf("Please change input id = %d, task not found", id)
+	} else {
+		return Posts{}, fmt.Errorf("Please change input id = %d, task not found", id)
 	}
 }
 
+func (p *PostStore) DeletePost(id int) error {
+	p.mux.Lock()
+	defer p.mux.Unlock()
 
-func (ts *TaskStore) DeleteTask(id int) error {
-	ts.mux.Lock()
-	defer ts.mux.Unlock()
-
-	if _, ok := ts.tasks[id]; !ok {
+	if _, ok := p.Post[id]; !ok {
 		return fmt.Errorf("Please change input id = %d, task not found", id)
 
-	} else { 
+	} else {
 
-		delete(ts.tasks, id)
+		delete(p.Post, id)
 		return nil
 	}
 }
 
+func (p *PostStore) DeleteAllPost() error {
+	p.mux.Lock()
+	defer p.mux.Unlock()
 
-func (ts *TaskStore) DeleteAllTask() error {
-	ts.mux.Lock()
-	defer ts.mux.Unlock()
-
-	ts.tasks = make(map[int]Task)
+	p.Post = make(map[int]Posts)
 	return nil
 }
 
+func (p *PostStore) GetAllPost() []Posts {
+	p.mux.Lock()
+	defer p.mux.Unlock()
 
-func (ts *TaskStore) GetAllTask() []Task {
-	ts.mux.Lock()
-	defer ts.mux.Unlock()
-
-	all := make([]Task, 0, len(ts.tasks))
-	for _, task := range ts.tasks {
+	all := make([]Posts, 0, len(p.Post))
+	for _, task := range p.Post {
 		all = append(all, task)
 	}
 	return all
 }
 
+func (p *PostStore) GetPostByTags(tag string) []Posts {
+	p.mux.Lock()
+	defer p.mux.Unlock()
 
-func (ts *TaskStore) GetTaskByTags(tag string) []Task {
-	ts.mux.Lock()
-	defer ts.mux.Unlock()
+	var posts []Posts
 
-	var tasks []Task
-
-	for _,  task := range ts.tasks {
+	for _, task := range p.Post {
 		for _, tasktag := range task.Tags {
 			if tasktag == tag {
-				tasks = append(tasks, task)
+				posts = append(posts, task)
 				break
 			}
 		}
 	}
-	return tasks
+	return posts
 }
 
+func (p *PostStore) GetPostByDue(year int, mn time.Month, day int) []Posts {
+	p.mux.Lock()
+	defer p.mux.Unlock()
 
-func (ts *TaskStore) GetTaskByDue(year int, mn time.Month, day int) []Task {
-	ts.mux.Lock()
-	defer ts.mux.Unlock()
+	var posts []Posts
 
-	var tasks []Task
-
-	for _, task := range ts.tasks {
-		y, m, d := task.Due.Date()
+	for _, post := range p.Post {
+		y, m, d := post.Due.Date()
 		if y == year && m == mn && d == day {
-			tasks = append(tasks, task)
+			posts = append(posts, post)
 		}
 	}
-	return tasks
+	return posts
 }

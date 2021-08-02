@@ -10,37 +10,37 @@ import (
 	"strings"
 	"time"
 
-	taskstore "github.com/DiSShoRt/SimpleRest/store"
+	poststore "std/SimpleRest/store"
 )
 
-type taskServer struct {
-	store *taskstore.TaskStore
+type postStore struct {
+	store *poststore.PostStore
 }
 
-func NewTaskServer() *taskServer {
-	store := taskstore.New()
-	return &taskServer{store: store}
+func NewPostServer() *postStore {
+	store := poststore.New()
+	return &postStore{store: store}
 }
 
-func (ts *taskServer) taskHandler(w http.ResponseWriter, req *http.Request) {
-	if req.URL.Path == "/task/" {
-		// Request is plain "/task/", without trailing ID.
+func (ps *postStore) postHandler(w http.ResponseWriter, req *http.Request) {
+	if req.URL.Path == "/post/" {
+		// Request is plain "/post/", without trailing ID.
 		if req.Method == http.MethodPost {
-			ts.createTaskHandler(w, req)
+			ps.createPostHandler(w, req)
 		} else if req.Method == http.MethodGet {
-			ts.getAllTasksHandler(w, req)
+			ps.getAllPostsHandler(w, req)
 		} else if req.Method == http.MethodDelete {
-			ts.deleteAllTasksHandler(w, req)
+			ps.deleteAllPostsHandler(w, req)
 		} else {
 			http.Error(w, fmt.Sprintf("expect method GET, DELETE or POST at /task/, got %v", req.Method), http.StatusMethodNotAllowed)
 			return
 		}
 	} else {
-		// Request has an ID, as in "/task/<id>".
+		// Request has an ID, as in "/post/<id>".
 		path := strings.Trim(req.URL.Path, "/")
 		pathParts := strings.Split(path, "/")
 		if len(pathParts) < 2 {
-			http.Error(w, "expect /task/<id> in task handler", http.StatusBadRequest)
+			http.Error(w, "expect /post/<id> in task handler", http.StatusBadRequest)
 			return
 		}
 		id, err := strconv.Atoi(pathParts[1])
@@ -50,9 +50,9 @@ func (ts *taskServer) taskHandler(w http.ResponseWriter, req *http.Request) {
 		}
 
 		if req.Method == http.MethodDelete {
-			ts.deleteTaskHandler(w, req, int(id))
+			ps.deletePostHandler(w, req, int(id))
 		} else if req.Method == http.MethodGet {
-			ts.getTaskHandler(w, req, int(id))
+			ps.getPostHandler(w, req, int(id))
 		} else {
 			http.Error(w, fmt.Sprintf("expect method GET or DELETE at /task/<id>, got %v", req.Method), http.StatusMethodNotAllowed)
 			return
@@ -60,15 +60,16 @@ func (ts *taskServer) taskHandler(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func (ts *taskServer) createTaskHandler(w http.ResponseWriter, req *http.Request) {
+func (ps *postStore) createPostHandler(w http.ResponseWriter, req *http.Request) {
 	log.Printf("handling task create at %s\n", req.URL.Path)
 
 	// Types used internally in this handler to (de-)serialize the request and
 	// response from/to JSON.
-	type RequestTask struct {
-		Text string    `json:"text"`
-		Tags []string  `json:"tags"`
-		Due  time.Time `json:"due"`
+	type RequestPost struct {
+		Text   string    `json:"text"`
+		Author string    `json:"author"`
+		Tags   []string  `json:"tags"`
+		Due    time.Time `json:"due"`
 	}
 
 	type ResponseId struct {
@@ -89,14 +90,14 @@ func (ts *taskServer) createTaskHandler(w http.ResponseWriter, req *http.Request
 
 	dec := json.NewDecoder(req.Body)
 	dec.DisallowUnknownFields()
-	var rt RequestTask
+	var rt RequestPost
 	if err := dec.Decode(&rt); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	id := ts.store.CreateTask(rt.Text, rt.Tags, rt.Due)
-	fmt.Println(rt.Text, rt.Tags, rt.Due, ts.store )
+	id := ps.store.CreatePost(rt.Text, rt.Author, rt.Tags, rt.Due)
+	fmt.Println(rt.Text, rt.Tags, rt.Due, ps.store)
 	js, err := json.Marshal(ResponseId{ID: id})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -106,10 +107,10 @@ func (ts *taskServer) createTaskHandler(w http.ResponseWriter, req *http.Request
 	w.Write(js)
 }
 
-func (ts *taskServer) getAllTasksHandler(w http.ResponseWriter, req *http.Request) {
+func (ps *postStore) getAllPostsHandler(w http.ResponseWriter, req *http.Request) {
 	log.Printf("handling get all tasks at %s\n", req.URL.Path)
 
-	allTasks := ts.store.GetAllTask()
+	allTasks := ps.store.GetAllPost()
 	js, err := json.Marshal(allTasks)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -119,10 +120,10 @@ func (ts *taskServer) getAllTasksHandler(w http.ResponseWriter, req *http.Reques
 	w.Write(js)
 }
 
-func (ts *taskServer) getTaskHandler(w http.ResponseWriter, req *http.Request, id int) {
-	log.Printf("handling get task at %s\n", req.URL.Path)
+func (ps *postStore) getPostHandler(w http.ResponseWriter, req *http.Request, id int) {
+	log.Printf("handling get post at %s\n", req.URL.Path)
 
-	task, err := ts.store.GetTask(id)
+	task, err := ps.store.GetPost(id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
@@ -137,22 +138,22 @@ func (ts *taskServer) getTaskHandler(w http.ResponseWriter, req *http.Request, i
 	w.Write(js)
 }
 
-func (ts *taskServer) deleteTaskHandler(w http.ResponseWriter, req *http.Request, id int) {
-	log.Printf("handling delete task at %s\n", req.URL.Path)
+func (ps *postStore) deletePostHandler(w http.ResponseWriter, req *http.Request, id int) {
+	log.Printf("handling delete post at %s\n", req.URL.Path)
 
-	err := ts.store.DeleteTask(id)
+	err := ps.store.DeletePost(id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 	}
 }
 
-func (ts *taskServer) deleteAllTasksHandler(w http.ResponseWriter, req *http.Request) {
-	log.Printf("handling delete all tasks at %s\n", req.URL.Path)
-	ts.store.DeleteAllTask()
+func (ps *postStore) deleteAllPostsHandler(w http.ResponseWriter, req *http.Request) {
+	log.Printf("handling delete all posts at %s\n", req.URL.Path)
+	ps.store.DeleteAllPost()
 }
 
-func (ts *taskServer) tagHandler(w http.ResponseWriter, req *http.Request) {
-	log.Printf("handling tasks by tag at %s\n", req.URL.Path)
+func (ps *postStore) tagHandler(w http.ResponseWriter, req *http.Request) {
+	log.Printf("handling posts by tag at %s\n", req.URL.Path)
 
 	if req.Method != http.MethodGet {
 		http.Error(w, fmt.Sprintf("expect method GET /tag/<tag>, got %v", req.Method), http.StatusMethodNotAllowed)
@@ -167,7 +168,7 @@ func (ts *taskServer) tagHandler(w http.ResponseWriter, req *http.Request) {
 	}
 	tag := pathParts[1]
 
-	tasks := ts.store.GetTaskByTags(tag)
+	tasks := ps.store.GetPostByTags(tag)
 	js, err := json.Marshal(tasks)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -177,8 +178,8 @@ func (ts *taskServer) tagHandler(w http.ResponseWriter, req *http.Request) {
 	w.Write(js)
 }
 
-func (ts *taskServer) dueHandler(w http.ResponseWriter, req *http.Request) {
-	log.Printf("handling tasks by due at %s\n", req.URL.Path)
+func (ps *postStore) dueHandler(w http.ResponseWriter, req *http.Request) {
+	log.Printf("handling posts by due at %s\n", req.URL.Path)
 
 	if req.Method != http.MethodGet {
 		http.Error(w, fmt.Sprintf("expect method GET /due/<date>, got %v", req.Method), http.StatusMethodNotAllowed)
@@ -212,7 +213,7 @@ func (ts *taskServer) dueHandler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	tasks := ts.store.GetTaskByDue(year, time.Month(month), day)
+	tasks := ps.store.GetPostByDue(year, time.Month(month), day)
 	js, err := json.Marshal(tasks)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -224,8 +225,8 @@ func (ts *taskServer) dueHandler(w http.ResponseWriter, req *http.Request) {
 
 func main() {
 	mux := http.NewServeMux()
-	server := NewTaskServer()
-	mux.HandleFunc("/task/", server.taskHandler)
+	server := NewPostServer()
+	mux.HandleFunc("/post/", server.postHandler)
 	mux.HandleFunc("/tag/", server.tagHandler)
 	mux.HandleFunc("/due/", server.dueHandler)
 
