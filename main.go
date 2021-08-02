@@ -22,6 +22,7 @@ func NewPostServer() *postStore {
 	return &postStore{store: store}
 }
 
+
 func (ps *postStore) postHandler(w http.ResponseWriter, req *http.Request) {
 	if req.URL.Path == "/post/" {
 		// Request is plain "/post/", without trailing ID.
