@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	poststore "std/SimpleRest/store"
+	poststore "SimpleRest/store"
 )
 
 type postStore struct {
@@ -21,7 +21,6 @@ func NewPostServer() *postStore {
 	store := poststore.New()
 	return &postStore{store: store}
 }
-
 
 func (ps *postStore) postHandler(w http.ResponseWriter, req *http.Request) {
 	if req.URL.Path == "/post/" {
@@ -97,7 +96,7 @@ func (ps *postStore) createPostHandler(w http.ResponseWriter, req *http.Request)
 		return
 	}
 
-	id := ps.store.CreatePost(rt.Text, rt.Author, rt.Tags, rt.Due)
+	id := ps.store.AddPostToDb(rt.Text, rt.Author, rt.Tags, rt.Due)
 	fmt.Println(rt.Text, rt.Tags, rt.Due, ps.store)
 	js, err := json.Marshal(ResponseId{ID: id})
 	if err != nil {
@@ -111,7 +110,9 @@ func (ps *postStore) createPostHandler(w http.ResponseWriter, req *http.Request)
 func (ps *postStore) getAllPostsHandler(w http.ResponseWriter, req *http.Request) {
 	log.Printf("handling get all tasks at %s\n", req.URL.Path)
 
-	allTasks := ps.store.GetAllPost()
+	allTasks := ps.store.GetAllPostsDb()
+
+	fmt.Println(allTasks)
 	js, err := json.Marshal(allTasks)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -124,11 +125,12 @@ func (ps *postStore) getAllPostsHandler(w http.ResponseWriter, req *http.Request
 func (ps *postStore) getPostHandler(w http.ResponseWriter, req *http.Request, id int) {
 	log.Printf("handling get post at %s\n", req.URL.Path)
 
-	task, err := ps.store.GetPost(id)
+	task, err := ps.store.GetPostByIdDb(id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
+	task.Tags = []string(task.Tags)
 
 	js, err := json.Marshal(task)
 	if err != nil {
@@ -142,7 +144,7 @@ func (ps *postStore) getPostHandler(w http.ResponseWriter, req *http.Request, id
 func (ps *postStore) deletePostHandler(w http.ResponseWriter, req *http.Request, id int) {
 	log.Printf("handling delete post at %s\n", req.URL.Path)
 
-	err := ps.store.DeletePost(id)
+	err := ps.store.DeletePostFromDb(id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 	}
@@ -150,7 +152,7 @@ func (ps *postStore) deletePostHandler(w http.ResponseWriter, req *http.Request,
 
 func (ps *postStore) deleteAllPostsHandler(w http.ResponseWriter, req *http.Request) {
 	log.Printf("handling delete all posts at %s\n", req.URL.Path)
-	ps.store.DeleteAllPost()
+	ps.store.DeleteAllPostsFromDb()
 }
 
 func (ps *postStore) tagHandler(w http.ResponseWriter, req *http.Request) {
@@ -169,7 +171,7 @@ func (ps *postStore) tagHandler(w http.ResponseWriter, req *http.Request) {
 	}
 	tag := pathParts[1]
 
-	tasks := ps.store.GetPostByTags(tag)
+	tasks := ps.store.GetPostsByTagDb(tag)
 	js, err := json.Marshal(tasks)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
