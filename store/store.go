@@ -22,7 +22,6 @@ type PostStore struct {
 }
 
 type PostStoreManager interface {
-
 	AddPostToDb(author string, text string, tags []string, due time.Time) int
 	DeletePostFromDb(id int) error
 	DeleteAllPostsFromDb() error
@@ -45,7 +44,6 @@ func New() *PostStore {
 	return ts
 }
 
-
 func (ps *PostStore) AddPostToDb(author, text string, tags []string, due time.Time) int {
 
 	//create config string
@@ -54,6 +52,7 @@ func (ps *PostStore) AddPostToDb(author, text string, tags []string, due time.Ti
 	conf, err := pgx.ParseConnectionString(connStr)
 	if err != nil {
 		fmt.Errorf("connection string is bad %s", err)
+
 	}
 	//connect to db
 	db, err := pgx.Connect(conf)
@@ -119,6 +118,43 @@ func (ps *PostStore) DeleteAllPostsFromDb() error {
 		fmt.Errorf("cant connect to db %s ", err)
 	}
 	return nil
+}
+
+func (ps *PostStore) GetPostsByAuthorDb(author string) []Posts {
+	// create slice
+	posts := []Posts{}
+	//create config string
+	connStr := "user=anton password=123 dbname=postgres sslmode=disable"
+	//create config
+	conf, err := pgx.ParseConnectionString(connStr)
+	if err != nil {
+		fmt.Errorf("connection string is bad %s", err)
+	}
+	//create connection
+	db, err := pgx.Connect(conf)
+
+	if err != nil {
+		fmt.Errorf("cant connect to db %s", err)
+	}
+
+	all, err := db.Query("SELECT * FROM posts WHERE author = $1", author)
+
+	defer func() {
+		all.Close()
+		db.Close()
+	}()
+
+	for all.Next() {
+		p := Posts{}
+		all.Scan(&p.ID, &p.Author, &p.Text, &p.Tags, &p.Due)
+		if err != nil {
+			fmt.Errorf("simthing go wrong")
+		}
+
+		posts = append(posts, p)
+	}
+	fmt.Println(posts)
+	return posts
 }
 
 func (ps *PostStore) GetAllPostsDb() []Posts {
@@ -232,7 +268,6 @@ func (ps *PostStore) GetPostsByTagDb(tag string) []Posts {
 	}
 	return products
 }
-
 
 func (p *PostStore) CreatePost(tx string, author string, tags []string, due time.Time) int {
 	p.mux.Lock()

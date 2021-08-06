@@ -96,13 +96,45 @@ func (ps *postStore) createPostHandler(w http.ResponseWriter, req *http.Request)
 		return
 	}
 
-	id := ps.store.AddPostToDb(rt.Text, rt.Author, rt.Tags, rt.Due)
+	id := ps.store.AddPostToDb(rt.Author, rt.Text, rt.Tags, rt.Due)
 	fmt.Println(rt.Text, rt.Tags, rt.Due, ps.store)
 	js, err := json.Marshal(ResponseId{ID: id})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(js)
+}
+
+func (ps *postStore) authorHandler(w http.ResponseWriter, req *http.Request) {
+	path := strings.Trim(req.URL.Path, "/")
+	pathParts := strings.Split(path, "/")
+	if len(pathParts) < 2 && req.Method != http.MethodGet {
+		http.Error(w, "expect /post/<id> in task handler", http.StatusBadRequest)
+		return
+	}
+
+	ps.getPostsByAuthor(w, req, pathParts[1])
+
+}
+
+func (ps *postStore) getPostsByAuthor(w http.ResponseWriter, req *http.Request, author string) {
+	log.Printf("handling get all tasks at %s\n", req.URL.Path)
+
+	if req.Method != http.MethodGet {
+		http.Error(w, fmt.Sprintf("expect method GET /tag/<tag>, got %v", req.Method), http.StatusMethodNotAllowed)
+		return
+	}
+
+	fmt.Println(author)
+	allPosts := ps.store.GetPostsByAuthorDb(author)
+
+	js, err := json.Marshal(allPosts)
+	if err != nil {
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(js)
 }
@@ -147,6 +179,7 @@ func (ps *postStore) deletePostHandler(w http.ResponseWriter, req *http.Request,
 	err := ps.store.DeletePostFromDb(id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
+		return
 	}
 }
 
@@ -232,6 +265,7 @@ func main() {
 	mux.HandleFunc("/post/", server.postHandler)
 	mux.HandleFunc("/tag/", server.tagHandler)
 	mux.HandleFunc("/due/", server.dueHandler)
+	mux.HandleFunc("/author/", server.authorHandler)
 
 	log.Fatal(http.ListenAndServe("localhost:"+"8080", mux))
 }
