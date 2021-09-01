@@ -1,16 +1,16 @@
 package main
 
 import (
+	poststore "SimpleRest/store"
 	"encoding/json"
 	"fmt"
 	"log"
 	"mime"
 	"net/http"
 	"strconv"
-	"strings"
-	"time"
 
-	poststore "SimpleRest/store"
+	"github.com/gorilla/mux"
+	"time"
 )
 
 type postStore struct {
@@ -22,42 +22,14 @@ func NewPostServer() *postStore {
 	return &postStore{store: store}
 }
 
-func (ps *postStore) postHandler(w http.ResponseWriter, req *http.Request) {
-	if req.URL.Path == "/post/" {
-		// Request is plain "/post/", without trailing ID.
-		if req.Method == http.MethodPost {
-			ps.createPostHandler(w, req)
-		} else if req.Method == http.MethodGet {
-			ps.getAllPostsHandler(w, req)
-		} else if req.Method == http.MethodDelete {
-			ps.deleteAllPostsHandler(w, req)
-		} else {
-			http.Error(w, fmt.Sprintf("expect method GET, DELETE or POST at /task/, got %v", req.Method), http.StatusMethodNotAllowed)
-			return
-		}
-	} else {
-		// Request has an ID, as in "/post/<id>".
-		path := strings.Trim(req.URL.Path, "/")
-		pathParts := strings.Split(path, "/")
-		if len(pathParts) < 2 {
-			http.Error(w, "expect /post/<id> in task handler", http.StatusBadRequest)
-			return
-		}
-		id, err := strconv.Atoi(pathParts[1])
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-
-		if req.Method == http.MethodDelete {
-			ps.deletePostHandler(w, req, int(id))
-		} else if req.Method == http.MethodGet {
-			ps.getPostHandler(w, req, int(id))
-		} else {
-			http.Error(w, fmt.Sprintf("expect method GET or DELETE at /task/<id>, got %v", req.Method), http.StatusMethodNotAllowed)
-			return
-		}
+func renderJSON(w http.ResponseWriter, v interface{}) {
+	js, err := json.Marshal(v)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(js)
 }
 
 func (ps *postStore) createPostHandler(w http.ResponseWriter, req *http.Request) {
@@ -66,6 +38,7 @@ func (ps *postStore) createPostHandler(w http.ResponseWriter, req *http.Request)
 	// Types used internally in this handler to (de-)serialize the request and
 	// response from/to JSON.
 	type RequestPost struct {
+		ID     int       `json:"id"`
 		Text   string    `json:"text"`
 		Author string    `json:"author"`
 		Tags   []string  `json:"tags"`
@@ -97,35 +70,15 @@ func (ps *postStore) createPostHandler(w http.ResponseWriter, req *http.Request)
 	}
 
 	id := ps.store.AddPostToDb(rt.Author, rt.Text, rt.Tags, rt.Due)
+	rt.ID = id
 	fmt.Println(rt.Text, rt.Tags, rt.Due, ps.store)
-	js, err := json.Marshal(ResponseId{ID: id})
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(js)
+	renderJSON(w, rt)
 }
 
-func (ps *postStore) authorHandler(w http.ResponseWriter, req *http.Request) {
-	path := strings.Trim(req.URL.Path, "/")
-	pathParts := strings.Split(path, "/")
-	if len(pathParts) < 2 && req.Method != http.MethodGet {
-		http.Error(w, "expect /post/<id> in task handler", http.StatusBadRequest)
-		return
-	}
-
-	ps.getPostsByAuthor(w, req, pathParts[1])
-
-}
-
-func (ps *postStore) getPostsByAuthor(w http.ResponseWriter, req *http.Request, author string) {
+func (ps *postStore) getPostsByAuthor(w http.ResponseWriter, req *http.Request) {
 	log.Printf("handling get all tasks at %s\n", req.URL.Path)
 
-	if req.Method != http.MethodGet {
-		http.Error(w, fmt.Sprintf("expect method GET /tag/<tag>, got %v", req.Method), http.StatusMethodNotAllowed)
-		return
-	}
+	author := mux.Vars(req)["author"]
 
 	fmt.Println(author)
 	allPosts := ps.store.GetPostsByAuthorDb(author)
@@ -145,17 +98,13 @@ func (ps *postStore) getAllPostsHandler(w http.ResponseWriter, req *http.Request
 	allTasks := ps.store.GetAllPostsDb()
 
 	fmt.Println(allTasks)
-	js, err := json.Marshal(allTasks)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(js)
+	renderJSON(w, allTasks)
 }
 
-func (ps *postStore) getPostHandler(w http.ResponseWriter, req *http.Request, id int) {
+func (ps *postStore) getPostHandler(w http.ResponseWriter, req *http.Request) {
 	log.Printf("handling get post at %s\n", req.URL.Path)
+
+	id, _ := strconv.Atoi(mux.Vars(req)["id"])
 
 	task, err := ps.store.GetPostByIdDb(id)
 	if err != nil {
@@ -164,17 +113,12 @@ func (ps *postStore) getPostHandler(w http.ResponseWriter, req *http.Request, id
 	}
 	task.Tags = []string(task.Tags)
 
-	js, err := json.Marshal(task)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(js)
+	renderJSON(w, task)
 }
 
-func (ps *postStore) deletePostHandler(w http.ResponseWriter, req *http.Request, id int) {
+func (ps *postStore) deletePostHandler(w http.ResponseWriter, req *http.Request) {
 	log.Printf("handling delete post at %s\n", req.URL.Path)
+	id, _ := strconv.Atoi(mux.Vars(req)["id"])
 
 	err := ps.store.DeletePostFromDb(id)
 	if err != nil {
@@ -191,81 +135,43 @@ func (ps *postStore) deleteAllPostsHandler(w http.ResponseWriter, req *http.Requ
 func (ps *postStore) tagHandler(w http.ResponseWriter, req *http.Request) {
 	log.Printf("handling posts by tag at %s\n", req.URL.Path)
 
-	if req.Method != http.MethodGet {
-		http.Error(w, fmt.Sprintf("expect method GET /tag/<tag>, got %v", req.Method), http.StatusMethodNotAllowed)
-		return
-	}
-
-	path := strings.Trim(req.URL.Path, "/")
-	pathParts := strings.Split(path, "/")
-	if len(pathParts) < 2 {
-		http.Error(w, "expect /tag/<tag> path", http.StatusBadRequest)
-		return
-	}
-	tag := pathParts[1]
+	tag := mux.Vars(req)["tag"]
 
 	tasks := ps.store.GetPostsByTagDb(tag)
-	js, err := json.Marshal(tasks)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(js)
+	renderJSON(w, tasks)
 }
 
 func (ps *postStore) dueHandler(w http.ResponseWriter, req *http.Request) {
 	log.Printf("handling posts by due at %s\n", req.URL.Path)
 
-	if req.Method != http.MethodGet {
-		http.Error(w, fmt.Sprintf("expect method GET /due/<date>, got %v", req.Method), http.StatusMethodNotAllowed)
-		return
-	}
-
-	path := strings.Trim(req.URL.Path, "/")
-	pathParts := strings.Split(path, "/")
-
+	vars := mux.Vars(req)
 	badRequestError := func() {
 		http.Error(w, fmt.Sprintf("expect /due/<year>/<month>/<day>, got %v", req.URL.Path), http.StatusBadRequest)
 	}
-	if len(pathParts) != 4 {
-		badRequestError()
-		return
-	}
 
-	year, err := strconv.Atoi(pathParts[1])
-	if err != nil {
+	year, _ := strconv.Atoi(vars["year"])
+	month, _ := strconv.Atoi(vars["month"])
+	if month < int(time.January) || month > int(time.December) {
 		badRequestError()
 		return
 	}
-	month, err := strconv.Atoi(pathParts[2])
-	if err != nil || month < int(time.January) || month > int(time.December) {
-		badRequestError()
-		return
-	}
-	day, err := strconv.Atoi(pathParts[3])
-	if err != nil {
-		badRequestError()
-		return
-	}
-
+	day, _ := strconv.Atoi(vars["day"])
 	tasks := ps.store.GetPostByDue(year, time.Month(month), day)
-	js, err := json.Marshal(tasks)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(js)
+	renderJSON(w, tasks)
 }
 
 func main() {
-	mux := http.NewServeMux()
+	router := mux.NewRouter()
+	router.StrictSlash(true)
 	server := NewPostServer()
-	mux.HandleFunc("/post/", server.postHandler)
-	mux.HandleFunc("/tag/", server.tagHandler)
-	mux.HandleFunc("/due/", server.dueHandler)
-	mux.HandleFunc("/author/", server.authorHandler)
 
-	log.Fatal(http.ListenAndServe("localhost:"+"8080", mux))
+	router.HandleFunc("/post/", server.createPostHandler).Methods("POST")
+	router.HandleFunc("/post/", server.getAllPostsHandler).Methods("GET")
+	router.HandleFunc("/post/", server.deleteAllPostsHandler).Methods("DELETE")
+	router.HandleFunc("/post/{id:[0-9]+}/", server.getPostHandler).Methods("GET")
+	router.HandleFunc("/post/{id:[0-9]+}/", server.deletePostHandler).Methods("DELETE")
+	router.HandleFunc("/tag/{tag}/", server.tagHandler).Methods("GET")
+	router.HandleFunc("/author/{author}/", server.getPostsByAuthor).Methods("GET")
+	router.HandleFunc("/due/{year:[0-9]+}/{month:[0-9]+}/{day:[0-9]+}/", server.dueHandler).Methods("GET")
+	log.Fatal(http.ListenAndServe("localhost:"+"8080", router))
 }
